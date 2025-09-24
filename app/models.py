@@ -22,15 +22,25 @@ class Telemetry(BaseModel):
     smoke_detected: bool
     status: Literal["moving", "stopped"]
 
-    # Validador extra para asegurar que la fecha sea razonable
     @field_validator("ts")
     @classmethod
+
     def validate_ts(cls, value: datetime):
+        # Asegurar que value está en UTC
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        elif value.tzinfo != timezone.utc:
+            value = value.astimezone(timezone.utc)
+        
         now = datetime.now(timezone.utc)
-        if value > now.replace(microsecond=0) + timedelta(minutes=5):
+        
+        
+        if value > now + timedelta(minutes=10):
             raise ValueError("timestamp en el futuro no válido")
-        if value < now.replace(microsecond=0) - timedelta(days=3650):
+        
+        if value < now - timedelta(days=365):
             raise ValueError("timestamp demasiado antiguo")
+        
         return value
 
 
