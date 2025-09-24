@@ -5,3 +5,4 @@ sqlite-utils
 paho-mqtt
 pytest
 httpx
+requests
