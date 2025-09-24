@@ -141,3 +141,28 @@ def get_stats(vehicle_id: str, minutes: int = 60):
         "count": len(rows),
         "stats": stats,
     }
+
+
+# Enviar comandos al vehículo vía MQTT
+
+VALID_COMMANDS = {"start", "stop", "start_telemetry", "stop_telemetry"}
+
+from pydantic import BaseModel
+
+class CommandIn(BaseModel):
+    command: str
+
+@app.post("/vehicles/{vehicle_id}/commands", status_code=202)
+def send_command(vehicle_id: str, cmd: CommandIn):
+    if cmd.command not in VALID_COMMANDS:
+        raise HTTPException(status_code=400, detail="invalid command")
+
+    import os
+    if os.getenv("DISABLE_MQTT") == "1":
+        # modo pruebas sin MQTT
+        return {"published": True, "simulated": True}
+
+    import paho.mqtt.publish as publish
+    topic = f"vehicles/{vehicle_id}/commands"
+    publish.single(topic, cmd.json(), hostname="localhost", port=1883)
+    return {"published": True}
