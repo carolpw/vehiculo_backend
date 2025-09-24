@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.models import Telemetry
 import sqlite3
 from fastapi import HTTPException
+from datetime import datetime, timedelta, timezone  # Añadido timezone aquí
 
 app = FastAPI(title="Vehicle Telemetry API")
 
@@ -96,3 +97,47 @@ def get_latest(vehicle_id: str):
     if not row:
         raise HTTPException(status_code=404, detail="not found")
     return _row_to_telemetry_dict(row)
+
+# --- Que el servidor calcule estadísticas básicas de un vehículo en una ventana de tiempo (por defecto, los últimos 60 minutos) ---
+@app.get("/vehicles/{vehicle_id}/stats")
+def get_stats(vehicle_id: str, minutes: int = 60):
+    now = datetime.now(timezone.utc)  # Cambiado de datetime.utcnow()
+    window_min = now - timedelta(minutes=minutes)
+
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT speed_kmh, temperature_c, battery_pct, ts
+        FROM telemetry
+        WHERE vehicle_id=? AND ts BETWEEN ? AND ?
+        """,
+        (vehicle_id, window_min.isoformat(), now.isoformat())
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="no data in window")
+
+    def extract_stats(values):
+        vals = [v for v in values if v is not None]
+        return {
+            "min": min(vals),
+            "max": max(vals),
+            "avg": sum(vals) / len(vals)
+        }
+
+    stats = {
+        "speed_kmh": extract_stats([r["speed_kmh"] for r in rows]),
+        "temperature_c": extract_stats([r["temperature_c"] for r in rows]),
+        "battery_pct": extract_stats([r["battery_pct"] for r in rows]),
+    }
+
+    return {
+        "window_min": window_min.isoformat(),
+        "window_max": now.isoformat(),
+        "count": len(rows),
+        "stats": stats,
+    }
