@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic
+sqlite-utils
+paho-mqtt
+pytest

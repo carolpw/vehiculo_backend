@@ -1,0 +1,10 @@
+# Entorno virtual
+.venv/
+
+# Base de datos local
+data.db
+
+# Archivos de Python compilados
+__pycache__/
+*.pyc
+*.pyo
